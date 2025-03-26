@@ -7,19 +7,19 @@ local function clock(secs)
         { word = "second", amount = 1 } 
     }
 
-    local builtString = {}
+    local bs = {}
     for _, part in ipairs(timeParts) do
         if secs >= part.amount then
             local num = math.floor(secs / part.amount)
-            table.insert(builtString, string.format("%d %s%s", num, part.word, num > 1 and "s" or ""))
+            table.insert(bs, string.format("%d %s%s", num, part.word, num > 1 and "s" or ""))
             secs = secs % part.amount
         end
     end
 
-    return table.concat(builtString, ", ")
+    return table.concat(bs, ", ")
 end
 
-local function shortNum(input)
+local function sn(input)
     if not input then return "0" end
     input = tonumber(input) or 0
     
@@ -27,34 +27,34 @@ local function shortNum(input)
         return tostring(input)
     end
 
-    local endings = {"", "K", "M", "B", "T", "Qd", "Qn", "Sx"}
-    local currentEnd = 1
+    local ends = {"", "K", "M", "B", "T", "Qd", "Qn", "Sx"}
+    local ce = 1
 
-    while input >= 1000 and currentEnd < #endings do
+    while input >= 1000 and ce < ends do
         input = input / 1000
-        currentEnd = currentEnd + 1
+        ce = ce + 1
     end
 
-    return string.format("%.2f%s", input, endings[currentEnd])
+    return string.format("%.2f%s", input, ends[ce])
 end
 
-local function postHook(link, firstCard, secondCard)
+local function ph(link, fc, sc)
     local web = game:GetService("HttpService")
     local config = {
         ["Content-Type"] = "application/json"
     }
     
-    local function buildCard(card, fallbackTitle, fallbackDesc)
+    local function bc(card, fbt, fbd)
         local finalCard = {
-            title = card.title or fallbackTitle,
-            description = card.description or fallbackDesc,
+            title = card.title or fbt,
+            description = card.description or fbd,
             color = card.color or 3447003,
             thumbnail = {
                 url = card.thumbnail and card.thumbnail.url or "https://cdn.discordapp.com/attachments/1342961019193921638/1353058260877447178/ggh.png"
             },
             fields = {},
             footer = {
-                text = card.footer and card.footer.text or fallbackTitle,
+                text = card.footer and card.footer.text or fbt,
                 icon_url = "https://cdn.discordapp.com/attachments/1342961019193921638/1353058260877447178/ggh.png"
             },
             timestamp = card.timestamp or os.date("!%Y-%m-%dT%H:%M:%S.000Z")
@@ -71,18 +71,18 @@ local function postHook(link, firstCard, secondCard)
         return finalCard
     end
 
-    local processedFirst = buildCard(firstCard, "Player Stats", "**Player Stats:**")
-    local processedSecond = buildCard(secondCard, "Hatch Stats", "**Hatch Stats:**")
+    local pf = bc(fc, "Player Stats", "**Player Stats:**")
+    local ps = bc(sc, "Hatch Stats", "**Hatch Stats:**")
 
     local payload = {
         content = nil,
-        embeds = {processedFirst, processedSecond},
+        embeds = {pf, ps},
         username = "Player Stats",
         avatar_url = "https://cdn.discordapp.com/attachments/1342961019193921638/1353058260877447178/ggh.png",
         attachments = {}
     }
 
-    local encodeOK, jsonPayload = pcall(function()
+    local eo, jp = pcall(function()
         local function clean(data)
             if type(data) == "table" then
                 local cleaned = {}
@@ -102,8 +102,8 @@ local function postHook(link, firstCard, secondCard)
         return web:JSONEncode(clean(payload))
     end)
 
-    if not encodeOK then
-        warn("JSON Problem:", jsonPayload)
+    if not eo then
+        warn("JSON Problem:", jp)
         return false
     end
 
@@ -112,7 +112,7 @@ local function postHook(link, firstCard, secondCard)
             Url = link,
             Method = "POST",
             Headers = config,
-            Body = jsonPayload
+            Body = jp
         })
     end)
 
@@ -125,38 +125,38 @@ local function postHook(link, firstCard, secondCard)
 end
 
 
-local function playerStats(userData)
-    userData = userData or {}
-    local numbers = userData.stats or {}
+local function ps(ua)
+    ua = ua or {}
+    local numbers = ua.stats or {}
     local hatches = numbers.rarities or {}
 
-    local firstCard = {
+    local fc = {
         title = "Player Stats",
         color = 3447003,
         fields = {
             {
                 name = "🖱️ Clicks",
-                value = shortNum(userData.clicks),
+                value = sn(ua.clicks),
                 inline = true
             },
             {
                 name = "💎 Gems",
-                value = shortNum(userData.gems),
+                value = sn(ua.gems),
                 inline = true
             },
             {
                 name = "🔄 Rebirths",
-                value = shortNum(userData.rebirths),
+                value = sn(ua.rebirths),
                 inline = true
             },
             {
                 name = "🖱️ Total Clicks",
-                value = shortNum(numbers.totalClicks),
+                value = sn(numbers.totalClicks),
                 inline = true
             },
             {
                 name = "💎 Total Gems",
-                value = shortNum(numbers.totalGems),
+                value = sn(numbers.totalGems),
                 inline = true
             },
             {
@@ -171,13 +171,13 @@ local function playerStats(userData)
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    local secondCard = {
+    local sc = {
         title = "Hatch Stats",
         color = 3447003,
         fields = {
             {
                 name = "🥚 Eggs Opened",
-                value = shortNum(numbers.eggsOpened),
+                value = sn(numbers.eggsOpened),
                 inline = true
             },
             {
@@ -202,13 +202,13 @@ local function playerStats(userData)
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    return firstCard, secondCard
+    return fc, sc
 end
 
 
 _G.WebhookFunctions = {
     clock = clock,
-    shortNum = shortNum,
-    postHook = postHook,
-    playerStats = playerStats
+    sn = sn,
+    ph = ph,
+    ps = ps
 }
