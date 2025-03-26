@@ -1,123 +1,123 @@
-local function clock(secs)
-    local timeParts = {
-        { word = "week", amount = 604800 },  
-        { word = "day", amount = 86400 },  
-        { word = "hour", amount = 3600 }, 
-        { word = "minute", amount = 60 },  
-        { word = "second", amount = 1 } 
+local function formatTimePlayed(seconds)
+    local timeUnits = {
+        { name = "week", value = 604800 },  
+        { name = "day", value = 86400 },  
+        { name = "hour", value = 3600 }, 
+        { name = "minute", value = 60 },  
+        { name = "second", value = 1 } 
     }
 
-    local bs = {}
-    for _, part in ipairs(timeParts) do
-        if secs >= part.amount then
-            local num = math.floor(secs / part.amount)
-            table.insert(bs, string.format("%d %s%s", num, part.word, num > 1 and "s" or ""))
-            secs = secs % part.amount
+    local result = {}
+    for _, unit in ipairs(timeUnits) do
+        if seconds >= unit.value then
+            local count = math.floor(seconds / unit.value)
+            table.insert(result, string.format("%d %s%s", count, unit.name, count > 1 and "s" or ""))
+            seconds = seconds % unit.value
         end
     end
 
-    return table.concat(bs, ", ")
+    return table.concat(result, ", ")
 end
 
-local function sn(input)
-    if not input then return "0" end
-    input = tonumber(input) or 0
+local function discordabbreavite(number)
+    if not number then return "0" end
+    number = tonumber(number) or 0
     
-    if input < 1000 then
-        return tostring(input)
+    if number < 1000 then
+        return tostring(number)
     end
 
-    local ends = {"", "K", "M", "B", "T", "Qd", "Qn", "Sx"}
-    local ce = 1
+    local suffixes = {"", "K", "M", "B", "T", "Qd", "Qn", "Sx"}
+    local suffixIndex = 1
 
-    while input >= 1000 and ce < ends do
-        input = input / 1000
-        ce = ce + 1
+    while number >= 1000 and suffixIndex < #suffixes do
+        number = number / 1000
+        suffixIndex = suffixIndex + 1
     end
 
-    return string.format("%.2f%s", input, ends[ce])
+    return string.format("%.2f%s", number, suffixes[suffixIndex])
 end
 
-local function ph(link, fc, sc)
-    local web = game:GetService("HttpService")
-    local config = {
+local function SendMessageEMBED(url, embed1, embed2)
+    local http = game:GetService("HttpService")
+    local headers = {
         ["Content-Type"] = "application/json"
     }
     
-    local function bc(card, fbt, fbd)
-        local finalCard = {
-            title = card.title or fbt,
-            description = card.description or fbd,
-            color = card.color or 3447003,
+    local function createEmbed(embed, defaultTitle, defaultDescription)
+        local cleanEmbed = {
+            title = embed.title or defaultTitle,
+            description = embed.description or defaultDescription,
+            color = embed.color or 3447003,
             thumbnail = {
-                url = card.thumbnail and card.thumbnail.url or "https://cdn.discordapp.com/attachments/1342961019193921638/1353058260877447178/ggh.png"
+                url = embed.thumbnail and embed.thumbnail.url or "https://cdn.discordapp.com/attachments/1342961019193921638/1353058260877447178/ggh.png"
             },
             fields = {},
             footer = {
-                text = card.footer and card.footer.text or fbt,
+                text = embed.footer and embed.footer.text or defaultTitle,
                 icon_url = "https://cdn.discordapp.com/attachments/1342961019193921638/1353058260877447178/ggh.png"
             },
-            timestamp = card.timestamp or os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+            timestamp = embed.timestamp or os.date("!%Y-%m-%dT%H:%M:%S.000Z")
         }
         
-        for _, item in ipairs(card.fields or {}) do
-            table.insert(finalCard.fields, {
-                name = tostring(item.name or ""),
-                value = tostring(item.value or ""),
-                inline = item.inline ~= false
+        for _, field in ipairs(embed.fields or {}) do
+            table.insert(cleanEmbed.fields, {
+                name = tostring(field.name or ""),
+                value = tostring(field.value or ""),
+                inline = field.inline ~= false
             })
         end
         
-        return finalCard
+        return cleanEmbed
     end
 
-    local pf = bc(fc, "Player Stats", "**Player Stats:**")
-    local ps = bc(sc, "Hatch Stats", "**Hatch Stats:**")
+    local processedEmbed1 = createEmbed(embed1, "Player Statistics", "**Player Statistics:**")
+    local processedEmbed2 = createEmbed(embed2, "Hatching Analytics", "**Hatching Analytics:**")
 
-    local payload = {
+    local data = {
         content = nil,
-        embeds = {pf, ps},
-        username = "Player Stats",
+        embeds = {processedEmbed1, processedEmbed2},
+        username = "Player Statistics",
         avatar_url = "https://cdn.discordapp.com/attachments/1342961019193921638/1353058260877447178/ggh.png",
         attachments = {}
     }
 
-    local eo, jp = pcall(function()
-        local function clean(data)
-            if type(data) == "table" then
-                local cleaned = {}
-                for k, v in pairs(data) do
+    local jsonSuccess, jsonData = pcall(function()
+        local function sanitize(obj)
+            if type(obj) == "table" then
+                local sanitized = {}
+                for k, v in pairs(obj) do
                     if type(k) == "string" or type(k) == "number" then
-                        cleaned[k] = clean(v)
+                        sanitized[k] = sanitize(v)
                     end
                 end
-                return cleaned
-            elseif type(data) == "string" or type(data) == "number" or type(data) == "boolean" or data == nil then
-                return data
+                return sanitized
+            elseif type(obj) == "string" or type(obj) == "number" or type(obj) == "boolean" or obj == nil then
+                return obj
             else
-                return tostring(data)
+                return tostring(obj)
             end
         end
         
-        return web:JSONEncode(clean(payload))
+        return http:JSONEncode(sanitize(data))
     end)
 
-    if not eo then
-        warn("JSON Problem:", jp)
+    if not jsonSuccess then
+        warn("JSON Encoding Failed:", jsonData)
         return false
     end
 
-    local worked, result = pcall(function()
+    local success, response = pcall(function()
         return request({
-            Url = link,
+            Url = url,
             Method = "POST",
-            Headers = config,
-            Body = jp
+            Headers = headers,
+            Body = jsonData
         })
     end)
 
-    if not worked then
-        warn("Request Issue:", result)
+    if not success then
+        warn("Request Failed:", response)
         return false
     end
 
@@ -125,90 +125,90 @@ local function ph(link, fc, sc)
 end
 
 
-local function ps(ua)
-    ua = ua or {}
-    local numbers = ua.stats or {}
-    local hatches = numbers.rarities or {}
+local function fpdata(playerData)
+    playerData = playerData or {}
+    local stats = playerData.stats or {}
+    local rarities = stats.rarities or {}
 
-    local fc = {
-        title = "Player Stats",
+    local embed1 = {
+        title = "Player Statistics",
         color = 3447003,
         fields = {
             {
                 name = "🖱️ Clicks",
-                value = sn(ua.clicks),
+                value = discordabbreavite(playerData.clicks),
                 inline = true
             },
             {
                 name = "💎 Gems",
-                value = sn(ua.gems),
+                value = discordabbreavite(playerData.gems),
                 inline = true
             },
             {
                 name = "🔄 Rebirths",
-                value = sn(ua.rebirths),
+                value = discordabbreavite(playerData.rebirths),
                 inline = true
             },
             {
                 name = "🖱️ Total Clicks",
-                value = sn(numbers.totalClicks),
+                value = discordabbreavite(stats.totalClicks),
                 inline = true
             },
             {
                 name = "💎 Total Gems",
-                value = sn(numbers.totalGems),
+                value = discordabbreavite(stats.totalGems),
                 inline = true
             },
             {
-                name = "⏰ Play Time",
-                value = clock(tonumber(numbers.timePlayed) or 0),
+                name = "⏰ Time Played",
+                value = formatTimePlayed(tonumber(stats.timePlayed) or 0),
                 inline = true
             }
         },
         footer = {
-            text = "Player Stats"
+            text = "Player Statistics"
         },
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    local sc = {
-        title = "Hatch Stats",
+    local embed2 = {
+        title = "Hatching Statistics",
         color = 3447003,
         fields = {
             {
                 name = "🥚 Eggs Opened",
-                value = sn(numbers.eggsOpened),
+                value = discordabbreavite(stats.eggsOpened),
                 inline = true
             },
             {
                 name = "🌟 Eternals Hatched",
-                value = tostring(hatches.eternal or "0"),
+                value = tostring(rarities.eternal or "0"),
                 inline = true
             },
             {
                 name = "✨ Mythicals Hatched",
-                value = tostring(hatches.mythical or "0"),
+                value = tostring(rarities.mythical or "0"),
                 inline = true
             },
             {
                 name = "Legendarys Hatched",
-                value = tostring(hatches.legendary or "0"),
+                value = tostring(rarities.legendary or "0"),
                 inline = true
             }
         },
         footer = {
-            text = "Hatch Stats"
+            text = "Hatching Statistics"
         },
         timestamp = os.date("!%Y-%m-%dT%H:%M:%S.000Z")
     }
 
-    return fc, sc
+    return embed1, embed2
 end
 
 
 _G.WebhookFunctions = {
-    clock = clock,
-    sn = sn,
-    ph = ph,
-    ps = ps
+    formatTimePlayed = formatTimePlayed,
+    discordabbreavite = discordabbreavite,
+    SendMessageEMBED = SendMessageEMBED,
+    fpdata = fpdata
 }
