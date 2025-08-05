@@ -154,7 +154,7 @@ local function hop()
     if #srvs > 0 then
         local t = srvs[math.random(1, #srvs)]
         queue_on_teleport([[
-            loadstring(game:HttpGet("github here skid"))()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/nfnato/web/refs/heads/main/weed.lua"))()
         ]])
         tp:TeleportToPlaceInstance(pid, t, lp)
     end
